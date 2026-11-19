@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Classificador de Spam - MLOps</title>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --border: #dce1e7;
+      --text: #1e293b;
+      --muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success-bg: #dcfce7;
+      --success-text: #166534;
+      --danger-bg: #fee2e2;
+      --danger-text: #991b1b;
+      --warning-bg: #fef3c7;
+      --warning-text: #92400e;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+
+    /* Cabeçalho */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: #f8fafc;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    header h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .badges {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .badge {
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: #e2e8f0;
+      color: var(--text);
+    }
+
+    .badge.ok {
+      background: var(--success-bg);
+      color: var(--success-text);
+    }
+
+    .badge.error {
+      background: var(--danger-bg);
+      color: var(--danger-text);
+    }
+
+    /* Corpo principal em 2 colunas */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      border-bottom: 1px solid var(--border);
+    }
+
+    @media (max-width: 720px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .left-col {
+      padding: 1.5rem;
+      border-right: 1px solid var(--border);
+    }
+
+    .right-col {
+      padding: 1.5rem;
+      background: #fafbfc;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      color: var(--text);
+    }
+
+    input[type="password"],
+    input[type="text"],
+    textarea {
+      width: 100%;
+      padding: 0.65rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: var(--primary);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 110px;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    button {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: var(--text);
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+
+    button:hover {
+      background: #f1f5f9;
+    }
+
+    button.primary {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+
+    button.primary:hover {
+      background: var(--primary-hover);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Resultado */
+    .result-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+
+    .result-box {
+      padding: 1.25rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .tag-rotulo {
+      display: inline-block;
+      padding: 0.35rem 0.85rem;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 1rem;
+      text-transform: uppercase;
+    }
+
+    .tag-rotulo.spam {
+      background: var(--danger-bg);
+      color: var(--danger-text);
+    }
+
+    .tag-rotulo.nao_spam {
+      background: var(--success-bg);
+      color: var(--success-text);
+    }
+
+    .latency-text {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .prob-section {
+      margin-bottom: 0.85rem;
+    }
+
+    .prob-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      margin-bottom: 0.35rem;
+      color: var(--muted);
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 12px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--primary);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .version-footer {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .error-alert {
+      padding: 1rem;
+      border-radius: 8px;
+      background: var(--danger-bg);
+      color: var(--danger-text);
+      font-size: 0.9rem;
+      font-weight: 500;
+      border: 1px solid #fecaca;
+    }
+
+    .empty-state {
+      color: var(--muted);
+      font-size: 0.9rem;
+      padding: 1.5rem 0;
+      text-align: center;
+    }
+
+    /* Painel de operação */
+    .ops-panel {
+      padding: 1.25rem 1.5rem;
+      background: #f8fafc;
+    }
+
+    .ops-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .ops-header h2 {
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .ops-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 550px) {
+      .ops-cards {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .ops-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .ops-card span.val {
+      font-size: 1.05rem;
+      color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Cabeçalho com Versão e Status do /health -->
+    <header>
+      <h1>Classificador de spam</h1>
+      <div class="badges">
+        <span id="badge-versao" class="badge">versão --</span>
+        <span id="badge-ambiente" class="badge">amb: --</span>
+        <span id="badge-status" class="badge">Verificando...</span>
+      </div>
+    </header>
+
+    <!-- Área Principal -->
+    <div class="main-grid">
+      <!-- Coluna Esquerda: Entrada -->
+      <div class="left-col">
+        <label for="api-key">Chave de API (X-API-Key)</label>
+        <input
+          type="password"
+          id="api-key"
+          placeholder="Digite a chave configurada no .env"
+          autocomplete="off"
+        />
+
+        <label for="mensagem">Mensagem</label>
+        <textarea
+          id="mensagem"
+          placeholder="Digite ou cole aqui a mensagem para analisar..."
+        ></textarea>
+
+        <div class="btn-group">
+          <button id="btn-classificar" class="primary" onclick="classificarMensagem()">
+            Classificar
+          </button>
+          <button type="button" onclick="preencherExemplo('spam')">
+            Ex. spam
+          </button>
+          <button type="button" onclick="preencherExemplo('comum')">
+            Ex. comum
+          </button>
+        </div>
+      </div>
+
+      <!-- Coluna Direita: Resultado -->
+      <div class="right-col">
+        <div class="result-title">Resultado</div>
+
+        <!-- Estado inicial -->
+        <div id="resultado-vazio" class="result-box empty-state">
+          Envie uma mensagem ao lado para ver a classificação.
+        </div>
+
+        <!-- Caixa de Sucesso -->
+        <div id="resultado-sucesso" class="result-box" style="display: none;">
+          <div class="result-header">
+            <span id="res-rotulo" class="tag-rotulo">spam</span>
+            <span id="res-tempo" class="latency-text">resposta 0 ms</span>
+          </div>
+
+          <div class="prob-section">
+            <div class="prob-header">
+              <span>Probabilidade</span>
+              <strong id="res-prob-texto">0,00</strong>
+            </div>
+            <div class="progress-bar-bg">
+              <div id="res-prob-barra" class="progress-bar-fill"></div>
+            </div>
+          </div>
+
+          <div id="res-versao" class="version-footer">respondido pela v1</div>
+        </div>
+
+        <!-- Caixa de Erro -->
+        <div id="resultado-erro" class="error-alert" style="display: none;"></div>
+      </div>
+    </div>
+
+    <!-- Painel de Operação -->
+    <div class="ops-panel">
+      <div class="ops-header">
+        <h2>Painel de operação</h2>
+        <button id="btn-lote" type="button" onclick="enviarLote50()">
+          Enviar 50 requisições
+        </button>
+      </div>
+      <div class="ops-cards">
+        <div class="ops-card">
+          <span>Requisições</span>
+          <span id="metric-req" class="val">0</span>
+        </div>
+        <div class="ops-card">
+          <span>Erros 5xx</span>
+          <span id="metric-5xx" class="val">0</span>
+        </div>
+        <div class="ops-card">
+          <span>Latência média</span>
+          <span id="metric-lat" class="val">0 ms</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Contadores locais para o painel de operação
+    let totalRequisicoes = 0;
+    let totalErros5xx = 0;
+    let somaLatenciaMs = 0;
+
+    function atualizarPainelOperacao(statusHttp, latenciaMs) {
+      totalRequisicoes += 1;
+      if (statusHttp >= 500 || statusHttp === 0) {
+        totalErros5xx += 1;
+      }
+      somaLatenciaMs += latenciaMs;
+      const media = Math.round(somaLatenciaMs / totalRequisicoes);
+
+      document.getElementById("metric-req").textContent = totalRequisicoes;
+      document.getElementById("metric-5xx").textContent = totalErros5xx;
+      document.getElementById("metric-lat").textContent = `${media} ms`;
+    }
+
+    // 1. Consulta o endpoint GET /health para mostrar estado e versão do serviço
+    async function verificarHealth() {
+      const badgeVersao = document.getElementById("badge-versao");
+      const badgeAmbiente = document.getElementById("badge-ambiente");
+      const badgeStatus = document.getElementById("badge-status");
+
+      try {
+        const resposta = await fetch("/health");
+        if (!resposta.ok) {
+          throw new Error(`Status HTTP ${resposta.status}`);
+        }
+        const dados = await resposta.json();
+        badgeVersao.textContent = `versão ${dados.versao || "--"}`;
+        badgeAmbiente.textContent = `amb: ${dados.ambiente || "--"}`;
+        badgeStatus.textContent = dados.status === "ok" ? "Serviço OK" : "Degradado";
+        badgeStatus.className = "badge ok";
+      } catch (erro) {
+        badgeStatus.textContent = "Serviço Indisponível";
+        badgeStatus.className = "badge error";
+      }
+    }
+
+    // 2. Preenche exemplos prontos de spam e mensagem comum
+    function preencherExemplo(tipo) {
+      const campoMensagem = document.getElementById("mensagem");
+      if (tipo === "spam") {
+        campoMensagem.value = "PARABÉNS! Você ganhou um prêmio de R$ 5.000. Clique no link para resgatar agora!";
+      } else {
+        campoMensagem.value = "Oi, a reunião de alinhamento de amanhã foi adiada para quinta-feira às 14h.";
+      }
+    }
+
+    // 3. Mostra mensagem de erro clara na coluna direita
+    function mostrarErro(mensagem) {
+      document.getElementById("resultado-vazio").style.display = "none";
+      document.getElementById("resultado-sucesso").style.display = "none";
+      const caixaErro = document.getElementById("resultado-erro");
+      caixaErro.style.display = "block";
+      caixaErro.textContent = mensagem;
+    }
+
+    // 4. Envia POST /predict para classificar a mensagem
+    async function classificarMensagem() {
+      const chaveApi = document.getElementById("api-key").value;
+      const texto = document.getElementById("mensagem").value;
+      const botao = document.getElementById("btn-classificar");
+
+      botao.disabled = true;
+      const inicio = performance.now();
+
+      try {
+        const resposta = await fetch("/predict", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": chaveApi
+          },
+          body: JSON.stringify({ texto: texto })
+        });
+
+        const latencia = Math.round(performance.now() - inicio);
+        atualizarPainelOperacao(resposta.status, latencia);
+
+        if (resposta.status === 401) {
+          mostrarErro("Erro 401 (Não autorizado): Chave de API ausente ou incorreta.");
+          return;
+        }
+
+        if (resposta.status === 422 || resposta.status === 400) {
+          mostrarErro("Erro 422 (Dados inválidos): A mensagem não pode estar vazia.");
+          return;
+        }
+
+        if (!resposta.ok) {
+          mostrarErro(`Erro ${resposta.status}: Falha ao processar a requisição na API.`);
+          return;
+        }
+
+        const dados = await resposta.json();
+
+        // Exibe o resultado na tela
+        document.getElementById("resultado-vazio").style.display = "none";
+        document.getElementById("resultado-erro").style.display = "none";
+        document.getElementById("resultado-sucesso").style.display = "block";
+
+        const elRotulo = document.getElementById("res-rotulo");
+        elRotulo.textContent = dados.rotulo === "spam" ? "spam" : "não spam";
+        elRotulo.className = `tag-rotulo ${dados.rotulo}`;
+
+        document.getElementById("res-tempo").textContent = `resposta ${latencia} ms`;
+
+        const probFormatada = Number(dados.probabilidade).toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+        document.getElementById("res-prob-texto").textContent = probFormatada;
+        document.getElementById("res-prob-barra").style.width = `${Math.round(dados.probabilidade * 100)}%`;
+        document.getElementById("res-versao").textContent = `respondido pela ${dados.versao}`;
+      } catch (erro) {
+        const latencia = Math.round(performance.now() - inicio);
+        atualizarPainelOperacao(0, latencia);
+        mostrarErro("Erro de conexão: Não foi possível comunicar com a API (serviço fora do ar).");
+      } finally {
+        botao.disabled = false;
+      }
+    }
+
+    // 5. Envia 50 requisições para teste de carga (Painel de operação)
+    async function enviarLote50() {
+      const botaoLote = document.getElementById("btn-lote");
+      const chaveApi = document.getElementById("api-key").value;
+      const textoAtual = document.getElementById("mensagem").value || "Promoção imperdível clique aqui agora";
+
+      botaoLote.disabled = true;
+      for (let i = 1; i <= 50; i++) {
+        botaoLote.textContent = `Enviando (${i}/50)...`;
+        const inicio = performance.now();
+        try {
+          const resp = await fetch("/predict", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-API-Key": chaveApi
+            },
+            body: JSON.stringify({ texto: textoAtual })
+          });
+          atualizarPainelOperacao(resp.status, Math.round(performance.now() - inicio));
+        } catch (e) {
+          atualizarPainelOperacao(0, Math.round(performance.now() - inicio));
+        }
+      }
+      botaoLote.textContent = "Enviar 50 requisições";
+      botaoLote.disabled = false;
+    }
+
+    // Verifica o /health assim que a página abre e a cada 15 segundos
+    verificarHealth();
+    setInterval(verificarHealth, 15000);
+  </script>
+</body>
+</html>

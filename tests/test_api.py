@@ -1,16 +1,14 @@
 """Testes automatizados da API de classificação de spam (Etapa 3 - CI/CD)."""
-import os
+from fastapi.testclient import TestClient
 
-# Define variáveis de ambiente padrão para o ambiente de testes antes de importar a aplicação
-os.environ.setdefault("APP_ENV", "test")
-os.environ.setdefault("MODEL_VERSION", "v1")
-os.environ.setdefault("API_KEY", "chave-ficticia-123")
+import app.main as main_module
+from app.main import app
 
-from fastapi.testclient import TestClient  # noqa: E402
-from app.main import API_KEY, app  # noqa: E402
+# Garante uma chave de API conhecida durante a execução dos testes automatizados
+main_module.API_KEY = "chave-ficticia-123"
 
 client = TestClient(app)
-HEADERS = {"X-API-Key": API_KEY}
+HEADERS = {"X-API-Key": "chave-ficticia-123"}
 
 
 def test_health_retorna_200_e_formato_esperado():
@@ -25,7 +23,9 @@ def test_health_retorna_200_e_formato_esperado():
 
 def test_predict_classifica_mensagem_spam():
     """Verifica se POST /predict classifica corretamente uma mensagem típica de spam."""
-    payload = {"texto": "PARABÉNS! Você ganhou um prêmio de R$ 5.000. Clique no link para resgatar agora"}
+    payload = {
+        "texto": "PARABÉNS! Você ganhou um prêmio de R$ 5.000. Clique no link para resgatar agora"
+    }
     resposta = client.post("/predict", json=payload, headers=HEADERS)
     assert resposta.status_code == 200
     dados = resposta.json()

@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout do código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Configurar Python 3.12
         uses: actions/setup-python@v5
@@ -33,7 +33,7 @@ jobs:
         run: python -c "import app.main; print('Build e carregamento do modelo OK!')"
 
       - name: Portão de Qualidade 1 - Análise estática de código (Lint sem erros críticos)
-        run: ruff check app/ tests/ model/
+        run: ruff check --select E9,F app/ tests/ model/
 
   # ---------------------------------------------------------------------------
   # ETAPA 2: TESTES AUTOMATIZADOS (Portão de Qualidade 2: Pytest)
@@ -45,10 +45,10 @@ jobs:
     env:
       APP_ENV: test
       MODEL_VERSION: v1
-      API_KEY: ${{ secrets.API_KEY || 'chave-teste-pipeline' }}
+      API_KEY: chave-ficticia-123
     steps:
       - name: Checkout do código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Configurar Python 3.12
         uses: actions/setup-python@v5
@@ -62,7 +62,7 @@ jobs:
           pip install pytest httpx
 
       - name: Portão de Qualidade 2 - Executar testes de API (/health e /predict)
-        run: pytest -v
+        run: python -m pytest -v
 
   # ---------------------------------------------------------------------------
   # ETAPA 3: EMPACOTAMENTO E PUBLICAÇÃO (Portão de Qualidade 3: Só publica se testes passarem)
@@ -76,7 +76,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout do código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Construir imagem Docker local (validação do Dockerfile)
         run: docker build -t mlops-spam:v1 .

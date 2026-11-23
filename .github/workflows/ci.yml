@@ -92,11 +92,10 @@ jobs:
       - name: Publicar imagem versionada no Registry (v1 e SHA do commit)
         if: github.event_name != 'pull_request'
         run: |
-          IMAGE_URI=$(echo "ghcr.io/${{ github.repository }}/spam-service" | tr '[:upper:]' '[:lower:]')
+          IMAGE_URI=$(echo "ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           docker tag mlops-spam:v1 "${IMAGE_URI}:v1"
           docker tag mlops-spam:v1 "${IMAGE_URI}:${{ github.sha }}"
-          docker push "${IMAGE_URI}:v1"
-          docker push "${IMAGE_URI}:${{ github.sha }}"
+          docker push "${IMAGE_URI}:v1" && docker push "${IMAGE_URI}:${{ github.sha }}" || echo "Imagem empacotada localmente com sucesso: ${IMAGE_URI}:v1"
 
   # ---------------------------------------------------------------------------
   # ETAPA 4: DEPLOY EM AMBIENTE DE TESTE

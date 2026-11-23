@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spam-api-deployment
+  labels:
+    app: spam-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: spam-api
+  template:
+    metadata:
+      labels:
+        app: spam-api
+    spec:
+      containers:
+        - name: spam-api
+          image: mlops-spam:v1
+          # Essencial para o cluster local usar a imagem construída no Docker da sua máquina:
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          # Injeta as variáveis do ConfigMap (APP_ENV e MODEL_VERSION)
+          envFrom:
+            - configMapRef:
+                name: spam-api-config
+          # Injeta a senha (API_KEY) vinda do Secret
+          env:
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: spam-api-secret
+                  key: API_KEY
+          # Verifica se o container já está pronto para receber requisições
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # Verifica se o container continua vivo; se travar, o Kubernetes reinicia sozinho
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 15

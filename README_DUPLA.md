@@ -25,6 +25,12 @@ Construímos uma solução completa e empacotada em container para disponibiliza
    - Imagem containerizada baseada em `python:3.12-slim` garantindo reprodutibilidade entre qualquer máquina e ambiente de produção.
    - Isolamento de segredos e arquivos desnecessários via `.dockerignore` (impedindo que `.env`, `.venv/` e `.git/` entrem na imagem).
 
+4. **Implantação em Cluster Kubernetes Local (`k8s/`)**:
+   - **`k8s/configmap.yaml` (`ConfigMap`)**: Armazena as configurações não sensíveis (`APP_ENV` e `MODEL_VERSION`).
+   - **`k8s/secret.yaml` (`Secret`)**: Armazena de forma isolada o segredo de autenticação (`API_KEY`).
+   - **`k8s/deployment.yaml` (`Deployment`)**: Gerencia 2 réplicas (*Pods*) da imagem `mlops-spam:v1` com `imagePullPolicy: IfNotPresent`, injetando as variáveis do `ConfigMap` e do `Secret` e monitorando a saúde dos containers via `readinessProbe` e `livenessProbe` no endpoint `/health`.
+   - **`k8s/service.yaml` (`Service`)**: Expõe e balanceia o tráfego interno na porta `8000` entre as réplicas ativas do deployment.
+
 ---
 
 ## 2. Tecnologias escolhidas e justificativa
@@ -37,6 +43,7 @@ Construímos uma solução completa e empacotada em container para disponibiliza
 | **Machine Learning** | **scikit-learn (`1.8.0`) + Joblib** | Versão exata fixada (`1.8.0`) para garantir total compatibilidade na desserialização do pipeline salvo em `model/modelo.joblib`. |
 | **Front-end (Página Web)** | **HTML5, CSS3 e JavaScript (Vanilla)** | Sem necessidade de *build step* pesado ou dependências extras de Node.js. Servir a página diretamente pelo FastAPI unifica o deploy em um único serviço e elimina falhas de CORS. |
 | **Containerização** | **Docker (`python:3.12-slim`)** | Garante que o serviço rode de forma idêntica em qualquer ambiente com todas as dependências na versão exata, sem gravar segredos na imagem. |
+| **Orquestração** | **Kubernetes (Docker Desktop + `kubectl`)** | Alta disponibilidade com múltiplas réplicas, *self-healing* via probes em `/health` e separação declarativa de configuração (`ConfigMap`) e segredos (`Secret`). |
 | **Hospedagem em Nuvem** | **Render** | Integração contínua direta com o GitHub (deploy automático a partir da branch `main`) e gerenciamento seguro de variáveis de ambiente e segredos fora do código. |
 
 ---
@@ -186,7 +193,65 @@ Toda a configuração do sistema é feita via variáveis de ambiente, seguindo a
 
 ---
 
-## 6. URL Online (Publicação em Nuvem)
+## 6. Como implantar no Kubernetes (Cluster Local — Etapa 2)
+
+### Pré-requisitos
+- **Docker Desktop** com **Kubernetes habilitado** (`kubeadm`) e contexto `docker-desktop` ativo.
+- **`kubectl`** disponível no terminal.
+
+### Roteiro de implantação (Deploy)
+
+1. **Verificar o contexto e o nó do cluster**:
+   ```bash
+   kubectl config current-context
+   kubectl get nodes
+   ```
+   *(O nó `docker-desktop` deve estar com status `Ready`.)*
+
+2. **Construir a imagem versionada `v1` localmente**:
+   ```bash
+   docker build -t mlops-spam:v1 .
+   ```
+
+3. **Aplicar os manifestos do Kubernetes (`ConfigMap`, `Secret`, `Deployment` e `Service`)**:
+   ```bash
+   kubectl apply -f k8s/
+   ```
+
+4. **Verificar se os recursos e os Pods estão em execução (`Running` e `1/1 READY`)**:
+   ```bash
+   kubectl get pods,svc,configmap,secret
+   ```
+
+5. **Expor o serviço localmente via `port-forward` para validação**:
+   ```bash
+   kubectl port-forward svc/spam-api-service 8000:8000
+   ```
+
+6. **Validar a aplicação rodando no cluster**:
+   - **Página Web**: `http://localhost:8000/`
+   - **Healthcheck**: `http://localhost:8000/health`
+   - **Teste de predição via `curl`**:
+     ```bash
+     curl -X POST http://localhost:8000/predict \
+       -H "Content-Type: application/json" \
+       -H "X-API-Key: chave-ficticia-123" \
+       -d '{"texto": "Parabéns! Você ganhou um prêmio, clique no link"}'
+     ```
+
+7. **Comandos úteis de operação e limpeza no cluster**:
+   - Ver logs dos Pods:
+     ```bash
+     kubectl logs -l app=spam-api
+     ```
+   - Remover todos os recursos implantados:
+     ```bash
+     kubectl delete -f k8s/
+     ```
+
+---
+
+## 7. URL Online (Publicação em Nuvem)
 
 - **Repositório GitHub**: https://github.com/Ludirolim/mlops-spam-adriano-ludimila
 - **Plataforma de Hospedagem**: Render (Web Service)
@@ -198,7 +263,7 @@ Toda a configuração do sistema é feita via variáveis de ambiente, seguindo a
 
 ---
 
-## 7. Quem fez o quê (Divisão de Tarefas da Dupla)
+## 8. Quem fez o quê (Divisão de Tarefas da Dupla)
 
 O trabalho foi realizado em dupla com versionamento colaborativo no GitHub:
 
@@ -209,3 +274,4 @@ O trabalho foi realizado em dupla com versionamento colaborativo no GitHub:
 
 - **Ludimila**:
   - Desenvolvimento e alterações da página web em `app/static/index.html` (construção da interface visual conforme o modelo proposto, integração com os endpoints `/health` e `/predict`, exibição de probabilidades, latência, botões de exemplos prontos e tratamento visual de erros).
+  - Criação dos manifestos de implantação em Kubernetes (`k8s/configmap.yaml`, `k8s/secret.yaml`, `k8s/deployment.yaml` e `k8s/service.yaml`), validação no cluster local e documentação do roteiro de deploy no `README_DUPLA.md`.

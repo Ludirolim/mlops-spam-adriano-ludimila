@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spam-api-config
+data:
+  APP_ENV: "dev"
+  MODEL_VERSION: "v1"

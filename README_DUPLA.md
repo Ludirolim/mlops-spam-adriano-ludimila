@@ -292,6 +292,16 @@ ruff check app/ tests/ model/
 pytest -v
 ```
 
+### Evidências de Execução do Pipeline no GitHub Actions
+
+1. **Execução com Falha (Portão de Qualidade bloqueando o avanço — Run `#1`)**:
+   - O **Portão de Qualidade 1 (`1. Build e Lint - Ruff`)** detectou uma violação no linter e interrompeu imediatamente o pipeline, bloqueando a execução dos testes, do empacotamento Docker e do deploy:
+   ![Execução com Falha no Pipeline](docs/evidencias/pipeline-falha.png)
+
+2. **Execução com Sucesso (Todos os Portões de Qualidade Aprovados — Run `#3`)**:
+   - Após a correção, todas as 4 etapas (`1. Build e Lint` → `2. Testes Automatizados` → `3. Empacotar e Publicar Imagem Docker` → `4. Deploy em Ambiente de Teste`) foram concluídas com sucesso (`100% verde`):
+   ![Execução com Sucesso no Pipeline](docs/evidencias/pipeline-sucesso.png)
+
 ---
 
 ## 8. URL Online (Publicação em Nuvem)

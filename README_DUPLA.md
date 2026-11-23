@@ -251,7 +251,50 @@ Toda a configuração do sistema é feita via variáveis de ambiente, seguindo a
 
 ---
 
-## 7. URL Online (Publicação em Nuvem)
+## 7. Pipeline CI/CD e Portões de Qualidade (Etapa 3)
+
+O projeto possui um pipeline automatizado de Integração e Entrega Contínua configurado no **GitHub Actions** em [`.github/workflows/ci.yml`](.github/workflows/ci.yml), executado automaticamente a cada `push` ou `pull_request` na branch `main`.
+
+### Etapas do Pipeline (`build → testes → empacotamento → deploy`)
+
+1. **`build` (1. Build e Lint com Ruff)**:
+   - Cria um ambiente Linux limpo (`ubuntu-latest`) com Python `3.12`.
+   - Instala as dependências do `requirements.txt` e valida se o modelo `modelo.joblib` e a aplicação FastAPI carregam sem erros (*Smoke Build*).
+   - Executa a análise estática de código com `ruff check app/ tests/ model/`.
+2. **`testes` (2. Testes Automatizados com Pytest)** — `needs: build`:
+   - Executa a suíte de testes automatizados em [`tests/test_api.py`](tests/test_api.py) com `pytest -v`.
+3. **`empacotamento` (3. Empacotar e Publicar Imagem Docker no GHCR)** — `needs: testes`:
+   - Constrói a imagem Docker a partir do `Dockerfile`.
+   - Autentica no **GitHub Container Registry (`ghcr.io`)** usando o `GITHUB_TOKEN` nativo e publica a imagem versionada com as tags `:v1` e `:<commit-sha>`.
+4. **`deploy` (4. Deploy em Ambiente de Teste)** — `needs: empacotamento`:
+   - Aciona automaticamente o *Deploy Hook* do ambiente de teste no Render (lendo o segredo `${{ secrets.DEPLOY_HOOK_URL }}` sem expor credenciais no código).
+
+### Portões de Qualidade (*Quality Gates*) e Critérios de Aprovação
+
+O pipeline implementa **3 portões de qualidade** encadeados via `needs:` — se qualquer portão falhar, o pipeline é interrompido imediatamente e as etapas seguintes são bloqueadas:
+
+| Portão de Qualidade | Ferramenta / Comando | Critério de Aprovação |
+|---|---|---|
+| **Portão 1: Build Limpo & Lint** | `pip install` + `ruff check` | Todas as dependências devem instalar sem erro, o modelo `.joblib` deve carregar e o código Python não pode conter erros de sintaxe ou falhas críticas apontadas pelo Ruff. |
+| **Portão 2: Testes Automatizados de Contrato e Modelo** | `pytest -v` (`tests/test_api.py`) | Todos os 5 testes devem passar:<br>1. `GET /health` retorna HTTP `200` com `status: "ok"`, `versao` e `ambiente`.<br>2. `POST /predict` classifica mensagem de spam como `"spam"` com probabilidade entre `0.0` e `1.0`.<br>3. `POST /predict` classifica mensagem comum como `"nao_spam"`.<br>4. `POST /predict` sem `X-API-Key` ou com chave errada retorna HTTP `401`.<br>5. `POST /predict` com texto vazio retorna erro `4xx` (`422`). |
+| **Portão 3: Publicação Condicionada da Imagem** | `needs: testes` + `docker build` | A imagem Docker só é construída, publicada no `ghcr.io` e enviada para deploy se os Portões 1 e 2 forem aprovados (`100% verdes`). |
+
+### Como rodar o Lint e os Testes Automatizados localmente
+
+```bash
+# Instalar ferramentas de teste e lint no ambiente virtual (.venv)
+pip install pytest httpx ruff
+
+# Rodar a análise de código (Portão 1)
+ruff check app/ tests/ model/
+
+# Rodar os testes automatizados da API (Portão 2)
+pytest -v
+```
+
+---
+
+## 8. URL Online (Publicação em Nuvem)
 
 - **Repositório GitHub**: https://github.com/Ludirolim/mlops-spam-adriano-ludimila
 - **Plataforma de Hospedagem**: Render (Web Service)
@@ -263,7 +306,7 @@ Toda a configuração do sistema é feita via variáveis de ambiente, seguindo a
 
 ---
 
-## 8. Quem fez o quê (Divisão de Tarefas da Dupla)
+## 9. Quem fez o quê (Divisão de Tarefas da Dupla)
 
 O trabalho foi realizado em dupla com versionamento colaborativo no GitHub:
 
@@ -275,3 +318,4 @@ O trabalho foi realizado em dupla com versionamento colaborativo no GitHub:
 - **Ludimila**:
   - Desenvolvimento e alterações da página web em `app/static/index.html` (construção da interface visual conforme o modelo proposto, integração com os endpoints `/health` e `/predict`, exibição de probabilidades, latência, botões de exemplos prontos e tratamento visual de erros).
   - Criação dos manifestos de implantação em Kubernetes (`k8s/configmap.yaml`, `k8s/secret.yaml`, `k8s/deployment.yaml` e `k8s/service.yaml`), validação no cluster local e documentação do roteiro de deploy no `README_DUPLA.md`.
+  - Implementação dos testes automatizados com `pytest` (`tests/test_api.py`) e construção do pipeline de CI/CD com portões de qualidade no GitHub Actions (`.github/workflows/ci.yml`).

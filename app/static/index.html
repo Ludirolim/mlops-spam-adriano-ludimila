@@ -428,12 +428,27 @@
   </div>
 
   <script>
-    // Contadores locais para o painel de operação
+    // Contadores de fallback para o painel de operação (caso /metrics falhe)
     let totalRequisicoes = 0;
     let totalErros5xx = 0;
     let somaLatenciaMs = 0;
 
-    function atualizarPainelOperacao(statusHttp, latenciaMs) {
+    async function carregarMetricas() {
+      try {
+        const resp = await fetch("/metrics");
+        if (!resp.ok) {
+          return;
+        }
+        const dados = await resp.json();
+        document.getElementById("metric-req").textContent = dados.requisicoes ?? 0;
+        document.getElementById("metric-5xx").textContent = dados.erros_5xx ?? 0;
+        document.getElementById("metric-lat").textContent = `${Math.round(dados.latencia_media_ms ?? 0)} ms`;
+      } catch (_) {
+        // Mantém valores atuais caso a API esteja indisponível no momento
+      }
+    }
+
+    async function atualizarPainelOperacao(statusHttp, latenciaMs) {
       totalRequisicoes += 1;
       if (statusHttp >= 500 || statusHttp === 0) {
         totalErros5xx += 1;
@@ -444,6 +459,8 @@
       document.getElementById("metric-req").textContent = totalRequisicoes;
       document.getElementById("metric-5xx").textContent = totalErros5xx;
       document.getElementById("metric-lat").textContent = `${media} ms`;
+
+      await carregarMetricas();
     }
 
     // 1. Consulta o endpoint GET /health para mostrar estado e versão do serviço
@@ -581,9 +598,13 @@
       botaoLote.disabled = false;
     }
 
-    // Verifica o /health assim que a página abre e a cada 15 segundos
+    // Verifica o /health e o /metrics assim que a página abre e a cada 15 segundos
     verificarHealth();
-    setInterval(verificarHealth, 15000);
+    carregarMetricas();
+    setInterval(() => {
+      verificarHealth();
+      carregarMetricas();
+    }, 15000);
   </script>
 </body>
 </html>

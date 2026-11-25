@@ -3,11 +3,13 @@
 O contrato da API está no README.md.
 Para rodar:  uvicorn app.main:app --reload
 """
+import logging
 import os
+import time
 from pathlib import Path
 
 import joblib
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -16,6 +18,12 @@ from pydantic import BaseModel, Field
 RAIZ = Path(__file__).resolve().parent.parent
 ENV_PATH = RAIZ / ".env"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+logger = logging.getLogger("spam_api")
 
 
 def _carregar_dotenv(caminho: Path) -> None:
@@ -43,6 +51,16 @@ MODEL_PATH = Path(
 # --- Modelo: carregado uma vez, quando a API inicia ---
 modelo = joblib.load(MODEL_PATH)
 
+# --- Métricas operacionais em memória (Etapa 4 - Observabilidade) ---
+metricas = {
+    "requisicoes": 0,
+    "erros_4xx": 0,
+    "erros_5xx": 0,
+    "soma_latencia_ms": 0.0,
+    "spam": 0,
+    "nao_spam": 0,
+}
+
 app = FastAPI(title="API de classificação de spam")
 
 app.add_middleware(
@@ -52,6 +70,35 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def middleware_observabilidade(request: Request, call_next):
+    """Mede a latência, contabiliza requisições/erros e registra logs operacionais."""
+    inicio = time.perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    finally:
+        latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
+        if request.url.path == "/predict" or status_code >= 500:
+            metricas["requisicoes"] += 1
+            metricas["soma_latencia_ms"] += latencia_ms
+            if 400 <= status_code < 500:
+                metricas["erros_4xx"] += 1
+            elif status_code >= 500:
+                metricas["erros_5xx"] += 1
+            logger.info(
+                "method=%s path=%s status=%d latency_ms=%.2f version=%s env=%s",
+                request.method,
+                request.url.path,
+                status_code,
+                latencia_ms,
+                MODEL_VERSION,
+                APP_ENV,
+            )
 
 
 class Mensagem(BaseModel):
@@ -67,6 +114,22 @@ def pagina_web():
 def health():
     return {
         "status": "ok",
+        "versao": MODEL_VERSION,
+        "ambiente": APP_ENV,
+    }
+
+
+@app.get("/metrics")
+def obter_metricas():
+    total = metricas["requisicoes"]
+    latencia_media = round(metricas["soma_latencia_ms"] / total, 2) if total > 0 else 0.0
+    return {
+        "requisicoes": total,
+        "erros_4xx": metricas["erros_4xx"],
+        "erros_5xx": metricas["erros_5xx"],
+        "latencia_media_ms": latencia_media,
+        "spam": metricas["spam"],
+        "nao_spam": metricas["nao_spam"],
         "versao": MODEL_VERSION,
         "ambiente": APP_ENV,
     }
@@ -88,6 +151,9 @@ def predict(
     indice = int(probabilidades.argmax())
     rotulo = str(modelo.classes_[indice])
     probabilidade = round(float(probabilidades[indice]), 2)
+
+    if rotulo in ("spam", "nao_spam"):
+        metricas[rotulo] += 1
 
     return {
         "rotulo": rotulo,

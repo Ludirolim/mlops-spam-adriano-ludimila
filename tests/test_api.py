@@ -1,4 +1,4 @@
-"""Testes automatizados da API de classificação de spam (Etapa 3 - CI/CD)."""
+"""Testes automatizados da API de classificação de spam (Etapa 3 e 4 - CI/CD e Observabilidade)."""
 from fastapi.testclient import TestClient
 
 import app.main as main_module
@@ -66,3 +66,15 @@ def test_predict_rejeita_texto_vazio_com_erro_4xx():
 
     resposta_espacos = client.post("/predict", json={"texto": "   "}, headers=HEADERS)
     assert 400 <= resposta_espacos.status_code < 500
+
+
+def test_metrics_retorna_200_e_contabiliza_operacao():
+    """Verifica se GET /metrics retorna as métricas operacionais exigidas pelo painel."""
+    resposta = client.get("/metrics")
+    assert resposta.status_code == 200
+    dados = resposta.json()
+    assert "requisicoes" in dados
+    assert "erros_5xx" in dados
+    assert "latencia_media_ms" in dados
+    assert dados["requisicoes"] >= 1
+    assert dados["erros_5xx"] == 0

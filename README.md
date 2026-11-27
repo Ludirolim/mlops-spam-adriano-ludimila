@@ -361,6 +361,12 @@ A aplicação implementa os pilares de observabilidade (Aula 06):
      - **Reinício controlado**: `kubectl rollout restart deployment/spam-api-deployment`
      - **Reversão imediata (Rollback)**: `kubectl rollout undo deployment/spam-api-deployment`
 
+4. **Evidências da Etapa 4 (Observabilidade e Automação)**:
+   - **Painel de Operação consumindo `/metrics` em tempo real**:
+     ![Painel de Operação e Métricas](docs/evidencias/painel-metricas.jpg)
+   - **Script de monitoramento contínuo (`scripts/monitorar_saude.py`) acompanhando a evolução de carga (`1 -> 54 requisições`)**:
+     ![Saída do Script de Monitoramento](docs/evidencias/monitoramento-script.jpg)
+
 ---
 
 ## 9. URL Online (Publicação em Nuvem)

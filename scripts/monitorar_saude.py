@@ -15,7 +15,7 @@ LIMITE_ERROS_5XX = 5
 LIMITE_LATENCIA_MS = 500.0
 
 
-def consultar_json(url: str, timeout: int = 3) -> tuple[bool, dict]:
+def consultar_json(url: str, timeout: int = 30) -> tuple[bool, dict]:
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:
             if resp.status == 200:

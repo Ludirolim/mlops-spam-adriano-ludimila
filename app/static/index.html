@@ -472,7 +472,7 @@
       try {
         const resposta = await fetch("/health");
         if (!resposta.ok) {
-          throw new Error(`Status HTTP ${resposta.status}`);
+          throw new Error("Serviço indisponível");
         }
         const dados = await resposta.json();
         badgeVersao.textContent = `versão ${dados.versao || "--"}`;
@@ -527,17 +527,17 @@
         atualizarPainelOperacao(resposta.status, latencia);
 
         if (resposta.status === 401) {
-          mostrarErro("Erro 401 (Não autorizado): Chave de API ausente ou incorreta.");
+          mostrarErro("Não foi possível autenticar a requisição. Verifique a chave informada.");
           return;
         }
 
         if (resposta.status === 422 || resposta.status === 400) {
-          mostrarErro("Erro 422 (Dados inválidos): A mensagem não pode estar vazia.");
+          mostrarErro("Por favor, digite uma mensagem válida antes de classificar.");
           return;
         }
 
         if (!resposta.ok) {
-          mostrarErro(`Erro ${resposta.status}: Falha ao processar a requisição na API.`);
+          mostrarErro("Não foi possível processar a solicitação no momento. Tente novamente.");
           return;
         }
 

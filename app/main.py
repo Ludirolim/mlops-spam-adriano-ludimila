@@ -3,9 +3,11 @@
 O contrato da API está no README.md.
 Para rodar:  uvicorn app.main:app --reload
 """
+import json
 import logging
 import os
 import time
+import uuid
 from pathlib import Path
 
 import joblib
@@ -21,9 +23,20 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    format="%(message)s",
 )
 logger = logging.getLogger("spam_api")
+
+
+def log_evento(nivel: str, mensagem: str, **campos) -> None:
+    """Emite log estruturado em JSON na saída padrão (conforme Aula 06)."""
+    registro = {
+        "hora": time.strftime("%H:%M:%S"),
+        "nivel": nivel,
+        "mensagem": mensagem,
+        **campos,
+    }
+    logger.info(json.dumps(registro, ensure_ascii=False))
 
 
 def _carregar_dotenv(caminho: Path) -> None:
@@ -74,8 +87,9 @@ app.add_middleware(
 
 @app.middleware("http")
 async def middleware_observabilidade(request: Request, call_next):
-    """Mede a latência, contabiliza requisições/erros e registra logs operacionais."""
+    """Mede a latência, contabiliza requisições/erros e registra logs estruturados em JSON."""
     inicio = time.perf_counter()
+    id_req = str(uuid.uuid4())[:8]
     status_code = 500
     try:
         response = await call_next(request)
@@ -86,18 +100,23 @@ async def middleware_observabilidade(request: Request, call_next):
         if request.url.path == "/predict" or status_code >= 500:
             metricas["requisicoes"] += 1
             metricas["soma_latencia_ms"] += latencia_ms
+            nivel = "INFO"
             if 400 <= status_code < 500:
                 metricas["erros_4xx"] += 1
+                nivel = "WARNING"
             elif status_code >= 500:
                 metricas["erros_5xx"] += 1
-            logger.info(
-                "method=%s path=%s status=%d latency_ms=%.2f version=%s env=%s",
-                request.method,
-                request.url.path,
-                status_code,
-                latencia_ms,
-                MODEL_VERSION,
-                APP_ENV,
+                nivel = "ERROR"
+            log_evento(
+                nivel,
+                "requisicao processada",
+                id=id_req,
+                metodo=request.method,
+                rota=request.url.path,
+                status=status_code,
+                ms=latencia_ms,
+                versao=MODEL_VERSION,
+                ambiente=APP_ENV,
             )
 
 

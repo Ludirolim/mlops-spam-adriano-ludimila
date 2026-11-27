@@ -6,6 +6,11 @@ metadata:
     app: spam-api
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: spam-api
@@ -21,6 +26,14 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
+          # Reserva e limite de recursos (Aula 07)
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
           # Injeta as variáveis do ConfigMap (APP_ENV e MODEL_VERSION)
           envFrom:
             - configMapRef:
@@ -38,11 +51,11 @@ spec:
               path: /health
               port: 8000
             initialDelaySeconds: 5
-            periodSeconds: 10
+            periodSeconds: 5
           # Verifica se o container continua vivo; se travar, o Kubernetes reinicia sozinho
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 15
+            initialDelaySeconds: 5
+            periodSeconds: 10

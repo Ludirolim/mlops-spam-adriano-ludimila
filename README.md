@@ -28,8 +28,9 @@ Construímos uma solução completa e empacotada em container para disponibiliza
 4. **Implantação em Cluster Kubernetes Local (`k8s/`)**:
    - **`k8s/configmap.yaml` (`ConfigMap`)**: Armazena as configurações não sensíveis (`APP_ENV` e `MODEL_VERSION`).
    - **`k8s/secret.yaml` (`Secret`)**: Armazena de forma isolada o segredo de autenticação (`API_KEY`).
-   - **`k8s/deployment.yaml` (`Deployment`)**: Gerencia 2 réplicas (*Pods*) da imagem `mlops-spam:v1` com `imagePullPolicy: IfNotPresent`, injetando as variáveis do `ConfigMap` e do `Secret` e monitorando a saúde dos containers via `readinessProbe` e `livenessProbe` no endpoint `/health`.
+   - **`k8s/deployment.yaml` (`Deployment`)**: Gerencia 2 réplicas (*Pods*) da imagem `mlops-spam:v1` com `imagePullPolicy: IfNotPresent`, estratégia `RollingUpdate` (`maxUnavailable: 0`, `maxSurge: 1`), reserva e limite de recursos (`requests` e `limits` de CPU/memória) e monitoramento de saúde via `readinessProbe` e `livenessProbe` no endpoint `/health`.
    - **`k8s/service.yaml` (`Service`)**: Expõe e balanceia o tráfego interno na porta `8000` entre as réplicas ativas do deployment.
+   - **`k8s/cronjob.yaml` (`CronJob`)**: Tarefa recorrente no cluster que verifica a saúde do serviço (`http://spam-api-service:8000/health`) a cada 5 minutos.
 
 ---
 
@@ -331,6 +332,34 @@ A aplicação implementa os pilares de observabilidade (Aula 06):
      }
      ```
    - O **Painel de Operação** na página web (`app/static/index.html`) consome `GET /metrics` automaticamente e permite disparar lotes de **50 requisições** para observar a evolução da latência média e do volume de tráfego.
+
+3. **Probes, Alertas Simples e Automação de Operações (Aula 07)**:
+   - **Probes e Recursos no Kubernetes (`k8s/deployment.yaml`)**:
+     - `readinessProbe` e `livenessProbe` consultando `GET /health` na porta `8000`.
+     - Reserva (`requests`: `100m` CPU, `128Mi` RAM) e limite (`limits`: `500m` CPU, `256Mi` RAM) com estratégia `RollingUpdate` sem indisponibilidade (`maxUnavailable: 0`, `maxSurge: 1`).
+   - **Regras de Alerta Simples e Automação (`scripts/monitorar_saude.py` e `k8s/cronjob.yaml`)**:
+
+     | Condição de Alerta | Limite Configurado | Como é Detectado | Ação / Automação |
+     |---|---|---|---|
+     | **Serviço fora do ar** | `/health` sem resposta 3 vezes seguidas | `scripts/monitorar_saude.py` e `k8s/cronjob.yaml` | Emite `ALERTA` e executa reinício controlado (`kubectl rollout restart deployment/spam-api-deployment`). |
+     | **Muitos erros 5xx** | `erros_5xx > 5` | Consulta periódica à rota `GET /metrics` | Emite `ALERTA` no terminal de monitoramento para inspeção de logs e possível rollback. |
+     | **Latência alta** | `latencia_media_ms > 500 ms` | Consulta periódica à rota `GET /metrics` | Emite `ALERTA` de degradação de desempenho. |
+
+   - **Como executar o script de monitoramento e automação**:
+     ```bash
+     # Verificação única de saúde e métricas:
+     python scripts/monitorar_saude.py --once
+
+     # Monitoramento contínuo a cada 10 segundos (com reinício automático após 3 falhas):
+     python scripts/monitorar_saude.py
+     ```
+
+   - **Mini-Runbook Operacional**:
+     - **Diagnóstico de Pods e Probes**: `kubectl get pods` e `kubectl describe pod <nome-do-pod>`
+     - **Leitura e filtro de logs de erro**: `kubectl logs -l app=spam-api` (ou `docker logs classificador-spam 2>&1 | Select-String "ERROR"`)
+     - **Escalonamento manual**: `kubectl scale deployment spam-api-deployment --replicas=3`
+     - **Reinício controlado**: `kubectl rollout restart deployment/spam-api-deployment`
+     - **Reversão imediata (Rollback)**: `kubectl rollout undo deployment/spam-api-deployment`
 
 ---
 

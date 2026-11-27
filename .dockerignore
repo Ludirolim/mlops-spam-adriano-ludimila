@@ -5,6 +5,5 @@ __pycache__
 *.pyc
 .env
 README.md
-README_DUPLA.md
 docs/
 data/
